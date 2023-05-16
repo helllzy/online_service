@@ -7,14 +7,14 @@ class Product(models.Model):
     hidden = models.BooleanField(default=False)
     rate = models.FloatField(default=0.0)
     price = models.FloatField(default=0.0)
-    photo = models.ImageField()
+    photo = models.ImageField(blank=True)
 
     def __str__(self) -> str:
         return self.name
 
 
 class User(AbstractUser):
-    # username = models.CharField(max_length=20)
+    # username
     bought_prods = models.ManyToManyField(Product, related_name='bought_products')
     created_prods = models.ManyToManyField(Product, related_name='created_products')
     class Meta(AbstractUser.Meta):
@@ -22,15 +22,15 @@ class User(AbstractUser):
         swappable = 'AUTH_USER_MODEL'
 
     def __str__(self) -> str:
-        return self.name
+        return self.username
 
 
 class Basket(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     products = models.ManyToManyField(Product, related_name='products_to_buy')
 
-    def __str__(self) -> str:
-        return self.name
+    # def __str__(self) -> str:
+    #     return self.user
     
 
 class Comment(models.Model):
@@ -39,4 +39,4 @@ class Comment(models.Model):
     comment = models.CharField(max_length=200)
     
     def __str__(self) -> str:
-        return self.name
+        return self.product.rate
