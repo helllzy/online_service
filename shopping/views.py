@@ -10,7 +10,8 @@ from knox.models import AuthToken
 from knox.views import LoginView as KnoxLoginView
 from .serializers import ProductSerializer, UserSerializer, RegisterSerializer, BasketSerializer, CommentSerializer
 from collections import namedtuple
-
+import os, glob
+from config import PATH
 
 nt = namedtuple("object", ["model", "serializers"])
 pattern = {
@@ -20,16 +21,43 @@ pattern = {
     "comment": nt(Comment, CommentSerializer),
 }
 
+
 class CreateDeleteUpdate:
     @login_required
     @api_view(["POST"])
     def create(request):
-        pass
+        username = request.user.username
+        user = User.objects.get(username=username)
+        name = request.data["name"]
+        available_count = request.data["available_count"]
+        price = request.data["price"]
+        product = Product.objects.create(
+            name=name,
+            available_count=available_count,
+            price=price
+            )
+        try:
+            photo = request.data["photo"]
+            product.photo = photo
+            product.save()
+            files = glob.glob(f'{PATH}/*')
+            print(files)
+            for fff in files:
+                os.remove(fff)
+        except:
+            print('ky')
+            pass
+        user.created_prods.add(product)
+        object = pattern.get('product', None)
+        serializer = object.serializers(Product.objects.filter(id=product.id), many=True)
+        return Response(serializer.data)
+
 
     @login_required
     @api_view(["POST"])
     def update(request):
         pass
+
 
     @login_required
     @api_view(["POST"])
@@ -44,6 +72,7 @@ class ProductView:
         object = pattern.get('product', None)
         serializer = object.serializers(Product.objects.filter(id=id), many=True)
         return Response(serializer.data)
+
 
     @login_required
     @api_view(["POST"])
@@ -98,6 +127,7 @@ class BasketView:
         serializer = object.serializers(basket)
         return Response(serializer.data)
     
+
     @login_required
     @api_view(["POST"])#добавить колво убираемого продукта
     def clear(request):
@@ -115,6 +145,7 @@ class BasketView:
         except:
             return Response({'error': 'don`t have a basket'})
     
+
     @login_required
     @api_view(["POST"])
     def view(request):
@@ -128,6 +159,7 @@ class BasketView:
         except:
             return Response({'error': 'don`t have a basket'})
         
+
     @login_required
     @api_view(["POST"])
     def delete(request):
@@ -156,6 +188,8 @@ def ListView(request, api_name):
             return Response(serializers.data)
         else:
             return Response({'error': 'login necessary'})
+        
+
 class RegisterAPI(generics.GenericAPIView):
     serializer_class = RegisterSerializer
 
