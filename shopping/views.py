@@ -10,7 +10,7 @@ from knox.models import AuthToken
 from knox.views import LoginView as KnoxLoginView
 from .serializers import ProductSerializer, UserSerializer, RegisterSerializer, BasketSerializer, CommentSerializer
 from collections import namedtuple
-import os, glob
+import shutil
 from config import PATH
 
 nt = namedtuple("object", ["model", "serializers"])
@@ -40,24 +40,52 @@ class CreateDeleteUpdate:
             photo = request.data["photo"]
             product.photo = photo
             product.save()
-            files = glob.glob(f'{PATH}/*')
-            print(files)
-            for fff in files:
-                os.remove(fff)
+            try:
+                shutil.rmtree(PATH)
+            except:
+                print(f'directory {PATH} wasn`t deleted')
         except:
-            print('ky')
             pass
         user.created_prods.add(product)
         object = pattern.get('product', None)
-        serializer = object.serializers(Product.objects.filter(id=product.id), many=True)
+        serializer = object.serializers(product)
         return Response(serializer.data)
 
 
     @login_required
     @api_view(["POST"])
     def update(request):
-        pass
-
+        username = request.user.username
+        user = User.objects.get(username=username)
+        data = request.data
+        if data.get("id"):
+            id = data.get("id")
+            product = Product.objects.get(id=id)
+            if user.bought_prods.get(id=id):
+                if data.get("name"):
+                    name = data.get("name")
+                    product.name = name
+                if data.get("available_count"):
+                    available_count = data.get("available_count")
+                    product.available_count = available_count
+                if data.get("price"):
+                    price = data.get("price")
+                    product.price = price
+                if data.get("photo"):
+                    photo = data.get("photo")
+                    product.photo = photo
+                    try:
+                        shutil.rmtree(PATH)
+                    except:
+                        print(f'directory {PATH} didn`t deleted')
+                product.save()
+                object = pattern.get('product', None)
+                serializer = object.serializers(product)
+                return Response(serializer.data)
+            else:
+                return Response({'error': 'user isn`t the owner of the product'})
+        else:
+            return Response({'error': 'user didn`t give product id'})
 
     @login_required
     @api_view(["POST"])
@@ -66,11 +94,10 @@ class CreateDeleteUpdate:
 
 
 class ProductView:
-    @login_required
     @api_view(["POST"])
     def view(request, id):
         object = pattern.get('product', None)
-        serializer = object.serializers(Product.objects.filter(id=id), many=True)
+        serializer = object.serializers(Product.objects.get(id=id))
         return Response(serializer.data)
 
 
@@ -84,20 +111,19 @@ class ProductView:
         if product.hidden == True:
             return Response({'product': product.id,
                              'error': 'product doesn`t available'})
-        products = Product.objects.filter(id=id)
         available = product.available_count
         if available >= count:
             available -= count
             user = User.objects.get(username=username)
             user.bought_prods.add(product)
-            products.update(available_count = F("available_count") - count)
+            product.available_count = F("available_count") - count
             object = pattern.get('user', user)
             serializer = object.serializers(user)
             if available == 0:
-                products.update(hidden=True)
+                product.hidden = True
             return Response(serializer.data)
         else:
-            products.update(hidden=True)
+            product.hidden = True
             return Response({'product': product.id,
                             'available_count': available,
                             'want_to_order': count,
