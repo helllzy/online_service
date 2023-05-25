@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, User, Basket, Comment 
+from .models import Product, User, Basket, Comment, HistoryRow, BasketRow
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -14,16 +14,28 @@ class BasketSerializer(serializers.ModelSerializer):
         fields = ("id", "user", "products")
 
 
+class BasketRowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = BasketRow
+        fields = ("product", "prod_count")
+
+
+class HistoryRowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = HistoryRow
+        fields = ("product", "prod_count")
+
+
 class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Comment
-        fields =("user", "product", "comment")
+        fields = ("user", "product", "comment", "rate")
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model  = User
-        fields = ("id", "email", "bought_prods", "created_prods", "username")
+        fields = ("id", "email", "bought_prods", "created_prods", "username", "photo")
 
 
 class RegisterSerializer(serializers.ModelSerializer):

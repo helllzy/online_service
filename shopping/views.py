@@ -5,10 +5,10 @@ from rest_framework.authtoken.serializers import AuthTokenSerializer
 from rest_framework.decorators import api_view
 from django.contrib.auth.decorators import login_required
 from django.db.models import F
-from .models import Product, User, Basket, Comment
+from .models import Product, User, Basket, BasketRow, Comment, HistoryRow, History
 from knox.models import AuthToken
 from knox.views import LoginView as KnoxLoginView
-from .serializers import ProductSerializer, UserSerializer, RegisterSerializer, BasketSerializer, CommentSerializer
+from .serializers import ProductSerializer, UserSerializer, RegisterSerializer, BasketSerializer, CommentSerializer, HistoryRowSerializer, BasketRowSerializer
 from collections import namedtuple
 import shutil
 from config import PATH
@@ -19,7 +19,60 @@ pattern = {
     "user": nt(User, UserSerializer),
     "basket": nt(Basket, BasketSerializer),
     "comment": nt(Comment, CommentSerializer),
+    "historyrow": nt(HistoryRow, HistoryRowSerializer),
+    "basketrow": nt(BasketRow, BasketRowSerializer),
 }
+
+class UserFunctions:
+    @login_required
+    @api_view(["GET"])
+    def user_info(request, username):
+        user = User.objects.get(username=username)
+        object = pattern.get('user')
+        serializer = object.serializers(user)
+        return Response(serializer.data)
+    
+
+    @login_required
+    @api_view(["POST"])
+    def user_edit_username(request, username):
+        user = User.objects.get(username=username)
+        new_username = request.data["new_username"]
+        user.username = new_username
+        user.save()
+        object = pattern.get('user')
+        serializer = object.serializers(user)
+        return Response(serializer.data)
+
+
+    @login_required
+    @api_view(["POST"])
+    def user_edit_photo(request, username):
+        user = User.objects.get(username=username)
+        new_photo = request.data["new_photo"]
+        user.photo = new_photo
+        user.save()
+        try:
+            shutil.rmtree(PATH)
+        except:
+            print(f'the directory {PATH} wasn`t deleted')
+        object = pattern.get('user')
+        serializer = object.serializers(user)
+        return Response(serializer.data)
+    
+
+    @login_required
+    @api_view(["GET"])
+    def user_view_history(request, username):
+        user = User.objects.get(username=username)
+        try:
+            history = History.objects.get(user=user)
+        except:
+            return Response({"You haven`t history yet"})
+        historyrow = HistoryRow.objects.filter(history=history)
+        object = pattern.get('historyrow')
+        serializer = object.serializers(historyrow, many=True)
+        return Response(serializer.data)
 
 
 class CreateDeleteUpdate:
@@ -36,18 +89,16 @@ class CreateDeleteUpdate:
             available_count=available_count,
             price=price
             )
-        try:
+        if request.data.get("photo"):
             photo = request.data["photo"]
             product.photo = photo
             product.save()
             try:
                 shutil.rmtree(PATH)
             except:
-                print(f'directory {PATH} wasn`t deleted')
-        except:
-            pass
+                print(f'the directory {PATH} wasn`t deleted')
         user.created_prods.add(product)
-        object = pattern.get('product', None)
+        object = pattern.get('product')
         serializer = object.serializers(product)
         return Response(serializer.data)
 
@@ -61,7 +112,7 @@ class CreateDeleteUpdate:
         if data.get("id"):
             id = data.get("id")
             product = Product.objects.get(id=id)
-            if user.bought_prods.get(id=id):
+            if user.created_prods.get(id=id):
                 if data.get("name"):
                     name = data.get("name")
                     product.name = name
@@ -77,9 +128,9 @@ class CreateDeleteUpdate:
                     try:
                         shutil.rmtree(PATH)
                     except:
-                        print(f'directory {PATH} didn`t deleted')
+                        print(f'the directory {PATH} didn`t deleted')
                 product.save()
-                object = pattern.get('product', None)
+                object = pattern.get('product')
                 serializer = object.serializers(product)
                 return Response(serializer.data)
             else:
@@ -87,18 +138,67 @@ class CreateDeleteUpdate:
         else:
             return Response({'error': 'user didn`t give product id'})
 
+
     @login_required
     @api_view(["POST"])
     def delete(request):
-        pass
+        username = request.user.username
+        user = User.objects.get(username=username)
+        data = request.data
+        if data.get("id"):
+            id = data.get("id")
+            if user.created_prods.get(id=id):
+                product = Product.objects.get(id=id)
+                product.delete()
+                object = pattern.get('user')
+                serializer = object.serializers(user)
+                return Response(serializer.data)
+            else:
+                return Response({'error': 'user isn`t the owner of the product'})
+        else:
+            return Response({'error': 'user didn`t give product id'})
 
 
 class ProductView:
     @api_view(["POST"])
     def view(request, id):
-        object = pattern.get('product', None)
-        serializer = object.serializers(Product.objects.get(id=id))
-        return Response(serializer.data)
+        product = Product.objects.get(id=id)
+        object1 = pattern.get('product')
+        object2 = pattern.get('comment')
+        prod_serializer = object1.serializers(product)
+        comms_serializer = object2.serializers(Comment.objects.filter(product=product), many=True)
+        return Response({"product_data": prod_serializer.data, "comments_data": comms_serializer.data})
+    
+
+    @login_required
+    @api_view(["POST"])
+    def add_comment(request):
+        username = request.user.username
+        user = User.objects.get(username=username)
+        product_id = request.data["product_id"]
+        comment_text = request.data["comment"]
+        product = Product.objects.get(id=product_id)
+        rate = request.data["rate"]
+        comment = Comment.objects.create(
+            comment = comment_text,
+            product = product,
+            user = user,
+            rate = rate
+        )
+        len_comm = len(Comment.objects.filter(product=product))
+        product.rate = f'{((product.rate*(len_comm-1)+float(rate))/len_comm):.1f}'
+        product.save()
+        if request.data.get("photo"):
+            photo = request.data["photo"]
+            comment.photo = photo
+            comment.save()
+            try:
+                shutil.rmtree(PATH)
+            except:
+                print(f'the directory {PATH} wasn`t deleted')
+        object = pattern.get('comment')
+        serializer = object.serializers(comment)
+        return Response({'data': serializer.data, 'rate': product.rate})
 
 
     @login_required
@@ -116,11 +216,22 @@ class ProductView:
             available -= count
             user = User.objects.get(username=username)
             user.bought_prods.add(product)
+            try:
+                history = History.objects.get(user=user)
+            except:
+                history = History.objects.create(
+                    user = user
+                )
+            history_row = HistoryRow.objects.create(
+                history = history,
+                product = product,
+                prod_count = count
+            )
             product.available_count = F("available_count") - count
-            object = pattern.get('user', user)
-            serializer = object.serializers(user)
             if available == 0:
                 product.hidden = True
+            object = pattern.get('historyrow')
+            serializer = object.serializers(history_row)
             return Response(serializer.data)
         else:
             product.hidden = True
@@ -132,7 +243,7 @@ class ProductView:
 
 class BasketView:
     @login_required
-    @api_view(["POST"])#добавить колво добавляемого продукта
+    @api_view(["POST"])
     def add(request):
         count = request.data["product_count"]
         username = request.user.username
@@ -144,18 +255,25 @@ class BasketView:
                              'error': 'product doesn`t available'})
         try:
             basket = Basket.objects.get(user=user)
-            basket.products.add(product)
         except:
-            basket = Basket(user=user)
-            basket.save()
-            basket.products.add(product)
-        object = pattern.get('basket', None)
-        serializer = object.serializers(basket)
+            basket = Basket.objects.create(user=user)
+        try:
+            basketrow = BasketRow.objects.get(basket = basket, product = product)
+            basketrow.prod_count += count
+            basketrow.save()
+        except:
+            basketrow = BasketRow.objects.create(
+                basket = basket,
+                product = product,
+                prod_count = count
+            )
+        object = pattern.get('basketrow')
+        serializer = object.serializers(basketrow)
         return Response(serializer.data)
     
 
     @login_required
-    @api_view(["POST"])#добавить колво убираемого продукта
+    @api_view(["POST"])
     def clear(request):
         count = request.data["product_count"]
         username = request.user.username
@@ -164,12 +282,18 @@ class BasketView:
         product = Product.objects.get(id=id)
         try:
             basket = Basket.objects.get(user=user)
-            basket.products.remove(product)
-            object = pattern.get('basket', None)
-            serializer = object.serializers(basket)
+            basketrow = BasketRow.objects.get(basket=basket, product = product)
+            if basketrow.prod_count <= count:
+                basketrow.delete()
+                return Response({'basketrow': 'deleted'})
+            else:
+                basketrow.prod_count -= count
+            basketrow.save()
+            object = pattern.get('basketrow')
+            serializer = object.serializers(basketrow)
             return Response(serializer.data)
         except:
-            return Response({'error': 'don`t have a basket'})
+            return Response({'error': 'don`t have a basket yet'})
     
 
     @login_required
@@ -179,12 +303,17 @@ class BasketView:
         user = User.objects.get(username=username)
         try:
             basket = Basket.objects.get(user=user)
-            object = pattern.get('basket', None)
-            serializer = object.serializers(basket)
-            return Response(serializer.data)
         except:
-            return Response({'error': 'don`t have a basket'})
-        
+            return Response({'error': 'don`t have a basket yet'})
+        basketrow = BasketRow.objects.filter(basket=basket)
+        sum = 0
+        for i in basketrow:
+            sum+=i.product.price*i.prod_count
+        basket_price = sum
+        object = pattern.get('basketrow')
+        serializer = object.serializers(basketrow, many=True)
+        return Response({"data": serializer.data, "basket_price": basket_price})
+    
 
     @login_required
     @api_view(["POST"])
@@ -193,10 +322,10 @@ class BasketView:
         user = User.objects.get(username=username)
         try:
             basket = Basket.objects.get(user=user)
-            basket.products.clear()
+            basket.delete()
             return Response({'basket': 'deleted'})
         except:
-            return Response({'error': 'don`t have a basket'})
+            return Response({'error': 'don`t have a basket yet'})
 
 
 @api_view(["GET"])

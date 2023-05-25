@@ -15,6 +15,8 @@ class Product(models.Model):
 
 class User(AbstractUser):
     # username
+    photo = models.ImageField(blank=True)
+    email = models.EmailField(max_length=50)
     bought_prods = models.ManyToManyField(Product, related_name='bought_products')
     created_prods = models.ManyToManyField(Product, related_name='created_products')
     class Meta(AbstractUser.Meta):
@@ -23,20 +25,38 @@ class User(AbstractUser):
 
     def __str__(self) -> str:
         return self.username
-
-
-class Basket(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    products = models.ManyToManyField(Product, related_name='products_to_buy')
-
-    # def __str__(self) -> str:
-    #     return self.user
     
 
 class Comment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     comment = models.CharField(max_length=200)
-    
+    photo = models.ImageField(blank=True)
+    rate = models.IntegerField()
+
     def __str__(self) -> str:
-        return self.product.rate
+        return self.comment
+
+
+class History(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name_plural = 'Histories'
+ 
+
+class HistoryRow(models.Model):
+    history = models.ForeignKey(History, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    prod_count = models.IntegerField()
+
+
+class Basket(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    general_price = models.FloatField(default=0.0)
+
+
+class BasketRow(models.Model):
+    basket = models.ForeignKey(Basket, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    prod_count = models.IntegerField()
