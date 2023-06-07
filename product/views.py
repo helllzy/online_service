@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view
 from django.contrib.auth.decorators import login_required
 from django.db.models import F
 from .models import Product
+from rest_framework import generics
 import sys
 sys.path.append("..user")
 from user.models import HistoryRow, History, User, Comment
@@ -10,9 +11,10 @@ from user.serializers import HistoryRowSerializer
 from .serializers import ProductSerializer, CommentSerializer
 from collections import namedtuple
 import shutil
-from config import PATH
+import os
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
-
+PATH = f'{os.getcwd()}/media'
 nt = namedtuple("object", ["model", "serializers"])
 pattern = {
     "product": nt(Product, ProductSerializer),
@@ -81,9 +83,13 @@ class CreateDeleteUpdate:
                 serializer = object.serializers(product)
                 return Response(serializer.data)
             else:
-                return Response({'error': f'{user.id} isn`t the owner of the product'})
+                return Response({
+                                'error': f'{user.id} isn`t the owner of the product'
+                                })
         else:
-            return Response({'error': f'{user.id} didn`t put product id'})
+            return Response({
+                            'error': f'{user.id} didn`t put product id'
+                            })
 
 
     @login_required
@@ -97,20 +103,35 @@ class CreateDeleteUpdate:
             if user.created_prods.get(id=id):
                 product = Product.objects.get(id=id)
                 product.delete()
-                return Response({'message': f'{user.id} deleted the product'})
+                return Response({
+                                'message': f'{user.id} deleted the product'
+                                })
             else:
-                return Response({'error': f'{user.id} isn`t the owner of the product'})
+                return Response({
+                                'error': f'{user.id} isn`t the owner of the product'
+                                })
         else:
-            return Response({'error': f'{user.id} didn`t put product id'})
+            return Response({
+                            'error': f'{user.id} didn`t put product id'
+                            })
 
-
+    
 class ProductView:
-    @api_view(["GET"])
-    def List(request):
-        object = pattern.get('product')
-        object_list = object.model.objects.filter(hidden=False)
-        serializers = object.serializers(object_list, many=True)
-        return Response(serializers.data)
+    class ProductsPaginated(generics.ListAPIView):
+        @api_view(["GET"])
+        def get(request):
+            products = Product.objects.filter(hidden=False)
+            paginator = Paginator(products, 3)
+            page = request.data.get('page')
+            try:
+                 products = paginator.page(page)
+            except PageNotAnInteger:
+                 products = paginator.page(1)
+            except EmptyPage:
+                 products = paginator.page(paginator.num_pages)
+            object = pattern.get('product')
+            serializers = object.serializers(products, many=True)
+            return Response(serializers.data)
 
 
     @api_view(["GET"])
@@ -120,7 +141,10 @@ class ProductView:
         object2 = pattern.get('comment')
         prod_serializer = object1.serializers(product)
         comms_serializer = object2.serializers(Comment.objects.filter(product=product), many=True)
-        return Response({"product_data": prod_serializer.data, "comments_data": comms_serializer.data})
+        return Response({
+                        "product_data": prod_serializer.data,
+                        "comments_data": comms_serializer.data
+                        })
     
 
     @login_required
@@ -151,7 +175,10 @@ class ProductView:
                 print(f'the directory {PATH} wasn`t deleted')
         object = pattern.get('comment')
         serializer = object.serializers(comment)
-        return Response({'data': serializer.data, 'rate': product.rate})
+        return Response({
+                        'data': serializer.data,
+                        'rate': product.rate
+                        })
 
 
     @login_required
@@ -162,7 +189,9 @@ class ProductView:
         id = request.data["product_id"]
         product = Product.objects.get(id=id)
         if product.hidden == True:
-            return Response({'error': f'{product.id} doesn`t available'})
+            return Response({
+                            'error': f'{product.id} doesn`t available'
+                            })
         available = product.available_count
         if available >= count:
             user = User.objects.get(username=username)

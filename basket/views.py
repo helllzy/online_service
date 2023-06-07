@@ -25,7 +25,9 @@ class BasketView:
         user = User.objects.get(username=username)
         product = Product.objects.get(id=id)
         if product.hidden == True:
-            return Response({'error': f'{product.id} doesn`t available'})
+            return Response({
+                            'error': f'{product.id} doesn`t available'
+                            })
         try:
             basket = Basket.objects.get(user=user)
         except:
@@ -58,7 +60,9 @@ class BasketView:
             basketrow = BasketRow.objects.get(basket=basket, product = product)
             if basketrow.prod_count <= count:
                 basketrow.delete()
-                return Response({'message': f'{product.id} deleted from {basket.id}'})
+                return Response({
+                                'message': f'{product.id} deleted from {basket.id}'
+                                })
             else:
                 basketrow.prod_count -= count
             basketrow.save()
@@ -66,7 +70,9 @@ class BasketView:
             serializer = object.serializers(basketrow)
             return Response(serializer.data)
         except:
-            return Response({'error': f'{user.id} doesn`t have a basket'})
+            return Response({
+                            'error': f'{user.id} doesn`t have a basket'
+                            })
     
 
     @login_required
@@ -77,7 +83,9 @@ class BasketView:
         try:
             basket = Basket.objects.get(user=user)
         except:
-            return Response({'error': f'{user.id} doesn`t have a basket'})
+            return Response({
+                            'error': f'{user.id} doesn`t have a basket'
+                            })
         basketrow = BasketRow.objects.filter(basket=basket)
         sum = 0
         for i in basketrow:
@@ -85,7 +93,10 @@ class BasketView:
         basket_price = sum
         object = pattern.get('basketrow')
         serializer = object.serializers(basketrow, many=True)
-        return Response({"data": serializer.data, "basket_price": basket_price})
+        return Response({
+                        "data": serializer.data,
+                        "basket_price": basket_price
+                        })
     
 
     @login_required
@@ -96,6 +107,10 @@ class BasketView:
         try:
             basket = Basket.objects.get(user=user)
             basket.delete()
-            return Response({'message': f'{user.id} deleted the basket'})
+            return Response({
+                            'message': f'{user.id} deleted the basket'
+                            })
         except:
-            return Response({'error': f'{user.id} doesn`t have a basket'})
+            return Response({
+                            'error': f'{user.id} doesn`t have a basket'
+                            })

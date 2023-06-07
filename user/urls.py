@@ -10,5 +10,6 @@ urlpatterns = [
     path('logoutall', knox_views.LogoutAllView.as_view(), name='logoutall'),
     path("<str:username>", UserFunctions.user_info, name='user_info'),
     path("<str:username>/edit", UserFunctions.user_edit, name='user_edit'),
-    path("<str:username>/view_history", UserFunctions.user_view_history, name='user_view_history')
+    path("<str:username>/activate/<str:token>", RegisterAPI.activate, name='user_activate'),
+    path("<str:username>/view_history", UserFunctions.UserHistoryPaginated.get, name='user_view_history')
 ]

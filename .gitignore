@@ -4,10 +4,13 @@ mediafiles/
 # Settings
 config.py
 
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+.pyc
+migrations/
 
 # C extensions
 *.so
